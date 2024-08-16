@@ -1,51 +1,56 @@
 import SwiftUI
 
+enum ScenePhaseType {
+    case active
+    case inactive
+    case background
+}
+
 struct ContentView: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(\.scenePhase) var scenePhase
+    @State var tmpStatus: ScenePhaseType = .active
+    @State var isActive: Bool = true
+    @State var isSleep: Bool = false
+    @State var inActiveCount: Int = 0
+
 
     var body: some View {
         VStack {
-            Text("非アクティブ: \(appState.inActiveCount.description)")
+            Text("非アクティブ: \(self.inActiveCount.description)")
                 .foregroundColor(.red)
                 .padding()
+            Text("\(tmpStatus)")
         }
-        .onChange(of: appState.isActive) {
-            if !appState.isActive {
-                showAlert()
+        .onChange(of: scenePhase) {
+            switch scenePhase {
+            case .active:
+                self.isSleep = false
+                self.tmpStatus = .active
+                print("アプリがアクティブになりました")
+            case .inactive:
+                if (self.tmpStatus == .active) {
+                    self.inActiveCount += 1
+                }
+                if (self.tmpStatus == .background && !isSleep){
+                    self.inActiveCount -= 1
+                }
+                self.tmpStatus = .inactive
+                print("アプリがインアクティブになりました")
+            case .background:
+                self.inActiveCount += 1
+                if (self.tmpStatus == .active) {
+                    self.inActiveCount -= 1
+                    self.isSleep = true
+                }
+                self.tmpStatus = .background
+                print("アプリがバックグラウンドに入りました")
+            @unknown default:
+                print("未知のフェーズに入りました")
             }
         }
     }
-
-
-    func showAlert() {
-        print("App moved to background.")
-    }
 }
-
-class AppState: ObservableObject {
-    @Published var isActive: Bool = true
-    @Published var inActiveCount: Int = 0
-
-    init() {
-        NotificationCenter.default.addObserver(self, selector: #selector(handleAppBecameActive), name: UIApplication.didBecomeActiveNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(handleAppResignActive), name: UIApplication.willResignActiveNotification, object: nil)
-    }
-
-    @objc func handleAppBecameActive() {
-        DispatchQueue.main.async {
-            self.isActive = true
-        }
-    }
-
-    @objc func handleAppResignActive() {
-        DispatchQueue.main.async {
-            self.isActive = false
-            self.inActiveCount += 1
-        }
-    }
-}
-
 
 #Preview {
-    ContentView().environmentObject(AppState())
+    ContentView()
 }
